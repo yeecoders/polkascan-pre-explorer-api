@@ -20,8 +20,8 @@
 import os
 
 DB_NAME = os.environ.get("DB_NAME", "polkascan")
-DB_HOST = os.environ.get("DB_HOST", "mysql")
-DB_PORT = os.environ.get("DB_PORT", 3306)
+DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
+DB_PORT = os.environ.get("DB_PORT", 33061)
 DB_USERNAME = os.environ.get("DB_USERNAME", "root")
 DB_PASSWORD = os.environ.get("DB_PASSWORD", "root")
 
@@ -29,7 +29,7 @@ DB_CONNECTION = os.environ.get("DB_CONNECTION", "mysql+mysqlconnector://{}:{}@{}
     DB_USERNAME, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME
 ))
 
-SUBSTRATE_RPC_URL = os.environ.get("SUBSTRATE_RPC_URL", "http://substrate-node:9933/")
+SUBSTRATE_RPC_URL = os.environ.get("SUBSTRATE_RPC_URL", "http://127.0.0.1:10033/")
 SUBSTRATE_ADDRESS_TYPE = int(os.environ.get("SUBSTRATE_ADDRESS_TYPE", 42))
 SUBSTRATE_METADATA_VERSION = int(os.environ.get("SUBSTRATE_METADATA_VERSION", 3))
 
@@ -39,7 +39,7 @@ DOGPILE_CACHE_SETTINGS = {
 
     'default_list_cache_expiration_time': 6,
     'default_detail_cache_expiration_time': 3600,
-    'host': os.environ.get("DOGPILE_CACHE_HOST", "redis"),
+    'host': os.environ.get("DOGPILE_CACHE_HOST", "127.0.0.1"),
     'port': os.environ.get("DOGPILE_CACHE_HOST", 6379),
     'db': os.environ.get("DOGPILE_CACHE_DB", 10)
 }

@@ -17,11 +17,11 @@
 #  along with Polkascan. If not, see <http://www.gnu.org/licenses/>.
 #
 #  polkascan.py
-
+import logging
 import falcon
 from dogpile.cache.api import NO_VALUE
 from sqlalchemy import func
-
+from datetime import datetime
 from app.models.data import Block, Extrinsic, Event, RuntimeCall, RuntimeEvent, Runtime, RuntimeModule, \
     RuntimeCallParam, RuntimeEventAttribute, RuntimeType, RuntimeStorage, Account, Session, DemocracyProposal, Contract, \
     BlockTotal, SessionValidator, Log, DemocracyReferendum, AccountIndex, RuntimeConstant, SessionNominator, \
@@ -48,11 +48,13 @@ class BlockDetailsResource(JSONAPIDetailResource):
     def get_relationships(self, include_list, item):
         relationships = {}
 
+
         if 'extrinsics' in include_list:
-            relationships['extrinsics'] = Extrinsic.query(self.session).filter_by(block_id=item.id).order_by(
+            relationships['extrinsics'] = Extrinsic.query(self.session).filter_by(block_id=item.id ).order_by(
                 'extrinsic_idx')
         if 'transactions' in include_list:
-            relationships['transactions'] = Extrinsic.query(self.session).filter_by(block_id=item.id, signed=1).order_by(
+            relationships['transactions'] = Extrinsic.query(self.session).filter_by(block_id=item.id,
+                                                                                    signed=1).order_by(
                 'extrinsic_idx')
         if 'inherents' in include_list:
             relationships['inherents'] = Extrinsic.query(self.session).filter_by(block_id=item.id, signed=0).order_by(
@@ -97,16 +99,14 @@ class ExtrinsicListResource(JSONAPIListResource):
         )
 
     def apply_filters(self, query, params):
-        if params.get('filter[signed]'):
 
+        if params.get('filter[signed]'):
             query = query.filter_by(signed=params.get('filter[signed]'))
 
         if params.get('filter[module_id]'):
-
             query = query.filter_by(module_id=params.get('filter[module_id]'))
 
         if params.get('filter[call_id]'):
-
             query = query.filter_by(call_id=params.get('filter[call_id]'))
 
         if params.get('filter[address]'):
@@ -141,17 +141,15 @@ class EventsListResource(JSONAPIListResource):
     def apply_filters(self, query, params):
 
         if params.get('filter[module_id]'):
-
             query = query.filter_by(module_id=params.get('filter[module_id]'))
 
         if params.get('filter[event_id]'):
-
             query = query.filter_by(event_id=params.get('filter[event_id]'))
 
         return query
 
     def get_query(self):
-        return Event.query(self.session).filter(Event.system == False).order_by(
+        return Event.query(self.session).filter(Event.system == True).order_by(
             Event.block_id.desc()
         )
 
@@ -180,7 +178,6 @@ class LogDetailResource(JSONAPIDetailResource):
 
 
 class NetworkStatisticsResource(JSONAPIResource):
-
     cache_expiration_time = 6
 
     def on_get(self, req, resp, network_id=None):
@@ -189,25 +186,42 @@ class NetworkStatisticsResource(JSONAPIResource):
         # TODO make caching more generic for custom resources
 
         cache_key = '{}-{}'.format(req.method, req.url)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel('INFO')
+        logger = logging.getLogger('yee')
+        logger.setLevel('DEBUG')
+        logger.addHandler(console_handler)
+        logger.info(cache_key)
 
         response = self.cache_region.get(cache_key, self.cache_expiration_time)
 
         if response is NO_VALUE:
 
-            best_block = BlockTotal.query(self.session).filter_by(id=self.session.query(func.max(BlockTotal.id)).one()[0]).first()
+            best_block = Block.query(self.session).filter_by(
+                id=self.session.query(func.max(Block.id)).one()[0]).first()
+            total_signed_extrinsics = Extrinsic.query(self.session).filter_by(signed=1).count()
+
+            total_accounts = Account.query(self.session).filter_by().count()
+
+            # total_events = Event.query(self.session).count()
+            event = Event.query(self.session).filter_by(
+                id=self.session.query(func.max(Event.id)).one()[0]).first()
             if best_block:
+                substrate = SubstrateInterface(SUBSTRATE_RPC_URL, metadata_version=SUBSTRATE_METADATA_VERSION)
+
                 response = self.get_jsonapi_response(
                     data={
                         'type': 'networkstats',
                         'id': network_id,
                         'attributes': {
                             'best_block': best_block.id,
-                            'total_signed_extrinsics': int(best_block.total_extrinsics_signed),
-                            'total_events': int(best_block.total_events),
-                            'total_events_module': int(best_block.total_events_module),
+                            'total_signed_extrinsics': total_signed_extrinsics,
+                            'total_events': event.id,
+                            'total_events_module': int(best_block.id),
                             'total_blocks': 'N/A',
-                            'total_accounts': int(best_block.total_accounts),
-                            'total_runtimes': Runtime.query(self.session).count()
+                            'total_accounts':total_accounts,
+                            'total_runtimes': Runtime.query(self.session).count(),
+                            'shard_count': int(substrate.get_ShardCount(), 16)
                         }
                     },
                 )
@@ -262,19 +276,21 @@ class BalanceTransferListResource(JSONAPIListResource):
 
     def serialize_item(self, item):
         return {
-                'type': 'balancetransfer',
-                'id': item.extrinsic_hash,
-                'attributes': {
-                    'block_id': item.block_id,
-                    'extrinsic_hash': item.extrinsic_hash,
-                    'sender': ss58_encode(item.address, SUBSTRATE_ADDRESS_TYPE),
-                    'sender_id': item.address,
-                    'destination': ss58_encode(item.params[0]['value'], SUBSTRATE_ADDRESS_TYPE),
-                    'destination_id': item.params[0]['value'].replace('0x', ''),
-                    'value': item.params[1]['value'],
-                    'success': item.success,
-                    'error': item.error,
-                }
+            'type': 'balancetransfer',
+            'id': item.extrinsic_hash,
+            'attributes': {
+                'block_id': item.block_id,
+                'extrinsic_hash': item.extrinsic_hash,
+                'sender': ss58_encode(item.address, SUBSTRATE_ADDRESS_TYPE),
+                'sender_id': item.address,
+                # 'destination': ss58_encode(item.params[0]['value'], SUBSTRATE_ADDRESS_TYPE),
+                'destination': 'G99',
+                'destination_id': '3',
+                'value': '2',
+                'success': item.success,
+                'error': item.error,
+                'datetime': datetime.strftime(item.datetime,'%Y-%m-%d %H:%M:%S')
+            }
         }
 
 
@@ -286,20 +302,20 @@ class BalanceTransferDetailResource(JSONAPIDetailResource):
 
     def serialize_item(self, item):
         return {
-                'type': 'balancetransfer',
-                'id': item.extrinsic_hash,
-                'attributes': {
-                    'block_id': item.block_id,
-                    'extrinsic_hash': item.extrinsic_hash,
-                    'extrinsic_idx': item.extrinsic_idx,
-                    'sender': ss58_encode(item.address, SUBSTRATE_ADDRESS_TYPE),
-                    'sender_id': item.address,
-                    'destination': ss58_encode(item.params[0]['value'], SUBSTRATE_ADDRESS_TYPE),
-                    'destination_id': item.params[0]['value'].replace('0x', ''),
-                    'value': item.params[1]['value'],
-                    'success': item.success,
-                    'error': item.error,
-                }
+            'type': 'balancetransfer',
+            'id': item.extrinsic_hash,
+            'attributes': {
+                'block_id': item.block_id,
+                'extrinsic_hash': item.extrinsic_hash,
+                'extrinsic_idx': item.extrinsic_idx,
+                'sender': ss58_encode(item.address, SUBSTRATE_ADDRESS_TYPE),
+                'sender_id': item.address,
+                'destination': ss58_encode(item.params[0]['value'], SUBSTRATE_ADDRESS_TYPE),
+                'destination_id': item.params[0]['value'].replace('0x', ''),
+                'value': item.params[1]['value'],
+                'success': item.success,
+                'error': item.error,
+            }
         }
 
 
@@ -312,7 +328,6 @@ class AccountResource(JSONAPIListResource):
 
 
 class AccountDetailResource(JSONAPIDetailResource):
-
     cache_expiration_time = 6
 
     def __init__(self):
@@ -340,48 +355,12 @@ class AccountDetailResource(JSONAPIDetailResource):
     def serialize_item(self, item):
         substrate = SubstrateInterface(SUBSTRATE_RPC_URL, metadata_version=SUBSTRATE_METADATA_VERSION)
         data = item.serialize()
+        print(item.address)
+        data['attributes']['free_balance'] = int(
+            substrate.get_Balance("tyee15c2cc2uj34w5jkfzxe4dndpnngprxe4nytaj9axmzf63ur4f8awq806lv6"), 16)
 
-        storage_call = RuntimeStorage.query(self.session).filter_by(
-            module_id='balances',
-            name='FreeBalance',
-        ).order_by(RuntimeStorage.spec_version.desc()).first()
-
-        data['attributes']['free_balance'] = substrate.get_storage(
-            block_hash=None,
-            module='Balances',
-            function='FreeBalance',
-            params=item.id,
-            return_scale_type=storage_call.type_value,
-            hasher=storage_call.type_hasher
-        )
-
-        storage_call = RuntimeStorage.query(self.session).filter_by(
-            module_id='balances',
-            name='ReservedBalance',
-        ).order_by(RuntimeStorage.spec_version.desc()).first()
-
-        data['attributes']['reserved_balance'] = substrate.get_storage(
-            block_hash=None,
-            module='Balances',
-            function='ReservedBalance',
-            params=item.id,
-            return_scale_type=storage_call.type_value,
-            hasher=storage_call.type_hasher
-        )
-
-        storage_call = RuntimeStorage.query(self.session).filter_by(
-            module_id='system',
-            name='AccountNonce',
-        ).order_by(RuntimeStorage.spec_version.desc()).first()
-
-        data['attributes']['nonce'] = substrate.get_storage(
-            block_hash=None,
-            module='System',
-            function='AccountNonce',
-            params=item.id,
-            return_scale_type=storage_call.type_value,
-            hasher=storage_call.type_hasher
-        )
+        data['attributes']['nonce'] = int(
+            substrate.get_Nonce("tyee15c2cc2uj34w5jkfzxe4dndpnngprxe4nytaj9axmzf63ur4f8awq806lv6"), 16)
 
         return data
 
@@ -410,7 +389,6 @@ class AccountIndexDetailResource(JSONAPIDetailResource):
 
 
 class SessionListResource(JSONAPIListResource):
-
     cache_expiration_time = 60
 
     def get_query(self):
@@ -441,7 +419,6 @@ class SessionDetailResource(JSONAPIDetailResource):
 
 
 class SessionValidatorListResource(JSONAPIListResource):
-
     cache_expiration_time = 60
 
     def get_query(self):
@@ -450,9 +427,7 @@ class SessionValidatorListResource(JSONAPIListResource):
         )
 
     def apply_filters(self, query, params):
-
         if params.get('filter[latestSession]'):
-
             session = Session.query(self.session).order_by(Session.id.desc()).first()
 
             query = query.filter_by(session_id=session.id)
@@ -481,7 +456,6 @@ class SessionValidatorDetailResource(JSONAPIDetailResource):
 
 
 class SessionNominatorListResource(JSONAPIListResource):
-
     cache_expiration_time = 60
 
     def get_query(self):
@@ -490,9 +464,7 @@ class SessionNominatorListResource(JSONAPIListResource):
         )
 
     def apply_filters(self, query, params):
-
         if params.get('filter[latestSession]'):
-
             session = Session.query(self.session).order_by(Session.id.desc()).first()
 
             query = query.filter_by(session_id=session.id)
@@ -553,7 +525,6 @@ class ContractDetailResource(JSONAPIDetailResource):
 
 
 class RuntimeListResource(JSONAPIListResource):
-
     cache_expiration_time = 60
 
     def get_query(self):
@@ -584,19 +555,16 @@ class RuntimeDetailResource(JSONAPIDetailResource):
 
 
 class RuntimeCallListResource(JSONAPIListResource):
-
     cache_expiration_time = 3600
 
     def apply_filters(self, query, params):
 
         if params.get('filter[latestRuntime]'):
-
             latest_runtime = Runtime.query(self.session).order_by(Runtime.spec_version.desc()).first()
 
             query = query.filter_by(spec_version=latest_runtime.spec_version)
 
         if params.get('filter[module_id]'):
-
             query = query.filter_by(module_id=params.get('filter[module_id]'))
 
         return query
@@ -635,19 +603,16 @@ class RuntimeCallDetailResource(JSONAPIDetailResource):
 
 
 class RuntimeEventListResource(JSONAPIListResource):
-
     cache_expiration_time = 3600
 
     def apply_filters(self, query, params):
 
         if params.get('filter[latestRuntime]'):
-
             latest_runtime = Runtime.query(self.session).order_by(Runtime.spec_version.desc()).first()
 
             query = query.filter_by(spec_version=latest_runtime.spec_version)
 
         if params.get('filter[module_id]'):
-
             query = query.filter_by(module_id=params.get('filter[module_id]'))
 
         return query
@@ -686,7 +651,6 @@ class RuntimeEventDetailResource(JSONAPIDetailResource):
 
 
 class RuntimeTypeListResource(JSONAPIListResource):
-
     cache_expiration_time = 3600
 
     def get_query(self):
@@ -695,9 +659,7 @@ class RuntimeTypeListResource(JSONAPIListResource):
         )
 
     def apply_filters(self, query, params):
-
         if params.get('filter[latestRuntime]'):
-
             latest_runtime = Runtime.query(self.session).order_by(Runtime.spec_version.desc()).first()
 
             query = query.filter_by(spec_version=latest_runtime.spec_version)
@@ -706,7 +668,6 @@ class RuntimeTypeListResource(JSONAPIListResource):
 
 
 class RuntimeModuleListResource(JSONAPIListResource):
-
     cache_expiration_time = 3600
 
     def get_query(self):
@@ -715,9 +676,7 @@ class RuntimeModuleListResource(JSONAPIListResource):
         )
 
     def apply_filters(self, query, params):
-
         if params.get('filter[latestRuntime]'):
-
             latest_runtime = Runtime.query(self.session).order_by(Runtime.spec_version.desc()).first()
 
             query = query.filter_by(spec_version=latest_runtime.spec_version)
@@ -769,7 +728,6 @@ class RuntimeStorageDetailResource(JSONAPIDetailResource):
 
 
 class RuntimeConstantListResource(JSONAPIListResource):
-
     cache_expiration_time = 3600
 
     def get_query(self):

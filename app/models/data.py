@@ -34,8 +34,8 @@ class Block(BaseModel):
     serialize_exclude = ['debug_info']
 
     serialize_type = 'block'
-
-    id = sa.Column(sa.Integer(), primary_key=True, autoincrement=False)
+    id = sa.Column(sa.Integer(), unique=True, autoincrement=True, nullable=False)
+    bid = sa.Column(sa.Integer(), nullable=False, index=True, primary_key=True)
     parent_id = sa.Column(sa.Integer(), nullable=False)
     hash = sa.Column(sa.String(66), unique=True, index=True, nullable=False)
     parent_hash = sa.Column(sa.String(66), index=True, nullable=False)
@@ -75,6 +75,13 @@ class Block(BaseModel):
     logs = sa.Column(sa.JSON(), default=None, server_default=None)
     spec_version_id = sa.Column(sa.String(64), nullable=False)
     debug_info = sa.Column(sa.JSON(), default=None, server_default=None)
+    mpmr = sa.Column(sa.String(66), nullable=False)
+    validators = sa.Column(sa.String(66), nullable=False)
+    shard_num = sa.Column(sa.Integer(), index=True, primary_key=True)
+    reward = sa.Column(sa.String(66), nullable=False)
+    fee = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+
+
 
     @classmethod
     def get_head(cls, session):
@@ -136,9 +143,11 @@ class BlockTotal(BaseModel):
 
 class Event(BaseModel):
     __tablename__ = 'data_event'
-
+    id = sa.Column(sa.Integer(), unique=True, autoincrement=True, nullable=False)
     block_id = sa.Column(sa.Integer(), primary_key=True, index=True)
-    block = relationship(Block, foreign_keys=[block_id], primaryjoin=block_id == Block.id)
+    shard_num = sa.Column(sa.Integer(), index=True, primary_key=True)
+    block = relationship(Block, foreign_keys=[block_id, shard_num],
+                         primaryjoin=block_id == Block.bid and shard_num == Block.shard_num)
 
     event_idx = sa.Column(sa.Integer(), primary_key=True, index=True)
 
@@ -158,7 +167,6 @@ class Event(BaseModel):
     attributes = sa.Column(sa.JSON())
 
     codec_error = sa.Column(sa.Boolean())
-
     def serialize_id(self):
         return '{}-{}'.format(self.block_id, self.event_idx)
 
@@ -181,9 +189,11 @@ class Event(BaseModel):
 class Extrinsic(BaseModel):
     __tablename__ = 'data_extrinsic'
 
+    id = sa.Column(sa.Integer(), unique=True, autoincrement=True, nullable=False)
     block_id = sa.Column(sa.Integer(), primary_key=True, index=True)
-    block = relationship(Block, foreign_keys=[block_id], primaryjoin=block_id == Block.id)
-
+    shard_num = sa.Column(sa.Integer(), index=True, primary_key=True)
+    block = relationship(Block, foreign_keys=[block_id, shard_num],
+                         primaryjoin=block_id == Block.bid and shard_num == Block.shard_num)
     extrinsic_idx = sa.Column(sa.Integer(), primary_key=True, index=True)
     extrinsic_hash = sa.Column(sa.String(64), index=True, nullable=True)
 
@@ -215,6 +225,7 @@ class Extrinsic(BaseModel):
     spec_version_id = sa.Column(sa.Integer())
 
     codec_error = sa.Column(sa.Boolean(), default=False)
+    datetime = sa.Column(sa.DateTime(timezone=True))
 
     def serialize_id(self):
         return '{}-{}'.format(self.block_id, self.extrinsic_idx)
@@ -253,11 +264,13 @@ class Extrinsic(BaseModel):
 class Log(BaseModel):
     __tablename__ = 'data_log'
 
-    block_id = sa.Column(sa.Integer(), primary_key=True, autoincrement=False)
-    log_idx = sa.Column(sa.Integer(), primary_key=True, autoincrement=False)
+    id = sa.Column(sa.Integer(), unique=True, autoincrement=True, nullable=False)
+    block_id = sa.Column(sa.Integer(), primary_key=True)
+    log_idx = sa.Column(sa.Integer(), primary_key=True)
     type_id = sa.Column(sa.Integer(), index=True)
     type = sa.Column(sa.String(64))
     data = sa.Column(sa.JSON())
+    shard_num = sa.Column(sa.Integer(), index=True, primary_key=True)
 
     def serialize_id(self):
         return '{}-{}'.format(self.block_id, self.log_idx)
@@ -285,6 +298,8 @@ class Account(BaseModel):
     balance = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
     created_at_block = sa.Column(sa.Integer(), nullable=False)
     updated_at_block = sa.Column(sa.Integer(), nullable=False)
+    shard_num = sa.Column(sa.Integer(), index=True, nullable=False)
+
 
     def serialize_id(self):
         return self.address

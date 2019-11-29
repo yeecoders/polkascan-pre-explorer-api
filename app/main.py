@@ -31,6 +31,7 @@ from app.middleware.sessionmanager import SQLAlchemySessionManager
 from app.middleware.cache import CacheMiddleware
 
 from app.resources import polkascan
+from app import health
 
 # Database connection
 engine = create_engine(DB_CONNECTION, echo=DEBUG, isolation_level="READ_UNCOMMITTED")
@@ -54,8 +55,10 @@ app = falcon.API(middleware=[
     SQLAlchemySessionManager(session_factory),
     CacheMiddleware(cache_region)
 ])
+health = health.Health()
 
 # Application routes
+app.add_route('/health', health)
 app.add_route('/block', polkascan.BlockListResource())
 app.add_route('/block/{block_id}', polkascan.BlockDetailsResource())
 app.add_route('/block-total', polkascan.BlockTotalListResource())

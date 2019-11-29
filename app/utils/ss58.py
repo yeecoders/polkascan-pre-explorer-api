@@ -68,24 +68,24 @@ def ss58_decode(address, valid_address_type=42):
 def ss58_encode(address, address_type=42):
     checksum_prefix = b'SS58PRE'
 
-    if type(address) is bytes or type(address) is bytearray:
-        address_bytes = address
-    else:
-        address_bytes = bytes.fromhex(address)
-    
-    if len(address_bytes) == 32:
-        # Checksum size is 2 bytes for public key
-        checksum_length = 2
-    elif len(address_bytes) in [1, 2, 4, 8]:
-        # Checksum size is 1 byte for account index
-        checksum_length = 1
-    else:
-        raise ValueError("Invalid length for address")
+    # if type(address) is bytes or type(address) is bytearray:
+    #     address_bytes = address
+    # else:
+    #     address_bytes = bytes.fromhex(address)
+    #
+    # if len(address_bytes) == 32:
+    #     # Checksum size is 2 bytes for public key
+    #     checksum_length = 2
+    # elif len(address_bytes) in [1, 2, 4, 8]:
+    #     # Checksum size is 1 byte for account index
+    #     checksum_length = 1
+    # else:
+    #     raise ValueError("Invalid length for address")
+    #
+    # address_format = bytes([address_type]) + address_bytes
+    # checksum = blake2b(checksum_prefix + address_format).digest()
 
-    address_format = bytes([address_type]) + address_bytes
-    checksum = blake2b(checksum_prefix + address_format).digest()
-
-    return base58.b58encode(address_format + checksum[:checksum_length]).decode()
+    return address
 
 
 def ss58_encode_account_index(account_index, address_type=42):
