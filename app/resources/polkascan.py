@@ -27,11 +27,12 @@ from app.models.data import Block, Extrinsic, Event, RuntimeCall, RuntimeEvent, 
     BlockTotal, SessionValidator, Log, DemocracyReferendum, AccountIndex, RuntimeConstant, SessionNominator, \
     DemocracyVote
 from app.resources.base import JSONAPIResource, JSONAPIListResource, JSONAPIDetailResource
-from app.settings import SUBSTRATE_RPC_URL, SUBSTRATE_METADATA_VERSION, SUBSTRATE_ADDRESS_TYPE, TYPE_REGISTRY
+from app.settings import SUBSTRATE_RPC_URL, SUBSTRATE_METADATA_VERSION, SUBSTRATE_ADDRESS_TYPE, TYPE_REGISTRY, HRP
 from app.type_registry import load_type_registry
 from app.utils.ss58 import ss58_decode, ss58_encode
 from scalecodec.base import RuntimeConfiguration
 from substrateinterface import SubstrateInterface
+from app.utils import bech32
 
 
 class BlockDetailsResource(JSONAPIDetailResource):
@@ -40,17 +41,21 @@ class BlockDetailsResource(JSONAPIDetailResource):
         return 'block_id'
 
     def get_item(self, item_id):
+
         if item_id.isnumeric():
             return Block.query(self.session).filter_by(id=item_id).first()
+        elif '-' in item_id:
+            st = item_id.split("-")
+            return Block.query(self.session).filter_by(bid=int(st[1]), shard_num=int(st[0])).first()
+
         else:
             return Block.query(self.session).filter_by(hash=item_id).first()
 
     def get_relationships(self, include_list, item):
         relationships = {}
 
-
         if 'extrinsics' in include_list:
-            relationships['extrinsics'] = Extrinsic.query(self.session).filter_by(block_id=item.id ).order_by(
+            relationships['extrinsics'] = Extrinsic.query(self.session).filter_by(block_id=item.id).order_by(
                 'extrinsic_idx')
         if 'transactions' in include_list:
             relationships['transactions'] = Extrinsic.query(self.session).filter_by(block_id=item.id,
@@ -110,11 +115,10 @@ class ExtrinsicListResource(JSONAPIListResource):
             query = query.filter_by(call_id=params.get('filter[call_id]'))
 
         if params.get('filter[address]'):
-
-            if len(params.get('filter[address]')) == 64:
-                account_id = params.get('filter[address]')
-            else:
-                account_id = ss58_decode(params.get('filter[address]'), SUBSTRATE_ADDRESS_TYPE)
+            # if len(params.get('filter[address]')) == 64:
+            account_id = params.get('filter[address]')
+            # else:
+            #     account_id = ss58_decode(params.get('filter[address]'), SUBSTRATE_ADDRESS_TYPE)
 
             query = query.filter_by(address=account_id)
 
@@ -219,7 +223,7 @@ class NetworkStatisticsResource(JSONAPIResource):
                             'total_events': event.id,
                             'total_events_module': int(best_block.id),
                             'total_blocks': 'N/A',
-                            'total_accounts':total_accounts,
+                            'total_accounts': total_accounts,
                             'total_runtimes': Runtime.query(self.session).count(),
                             'shard_count': int(substrate.get_ShardCount(), 16)
                         }
@@ -258,11 +262,10 @@ class BalanceTransferListResource(JSONAPIListResource):
 
     def apply_filters(self, query, params):
         if params.get('filter[address]'):
-
-            if len(params.get('filter[address]')) == 64:
-                account_id = params.get('filter[address]')
-            else:
-                account_id = ss58_decode(params.get('filter[address]'), SUBSTRATE_ADDRESS_TYPE)
+            # if len(params.get('filter[address]')) == 64:
+            account_id = params.get('filter[address]')
+            # else:
+            #     account_id = ss58_decode(params.get('filter[address]'), SUBSTRATE_ADDRESS_TYPE)
 
             query = query.filter_by(address=account_id)
 
@@ -281,15 +284,15 @@ class BalanceTransferListResource(JSONAPIListResource):
             'attributes': {
                 'block_id': item.block_id,
                 'extrinsic_hash': item.extrinsic_hash,
-                'sender': ss58_encode(item.address, SUBSTRATE_ADDRESS_TYPE),
+                'sender': bech32.encode(HRP, bytes().fromhex(item.address)),
                 'sender_id': item.address,
-                # 'destination': ss58_encode(item.params[0]['value'], SUBSTRATE_ADDRESS_TYPE),
+                'destination': bech32.encode(HRP, bytes().fromhex(item.params[0]['value'])),
                 'destination': 'G99',
                 'destination_id': '3',
                 'value': '2',
                 'success': item.success,
                 'error': item.error,
-                'datetime': datetime.strftime(item.datetime,'%Y-%m-%d %H:%M:%S')
+                'datetime': datetime.strftime(item.datetime, '%Y-%m-%d %H:%M:%S')
             }
         }
 
@@ -308,9 +311,9 @@ class BalanceTransferDetailResource(JSONAPIDetailResource):
                 'block_id': item.block_id,
                 'extrinsic_hash': item.extrinsic_hash,
                 'extrinsic_idx': item.extrinsic_idx,
-                'sender': ss58_encode(item.address, SUBSTRATE_ADDRESS_TYPE),
+                'sender': bech32.encode(HRP, bytes().fromhex(item.address)),
                 'sender_id': item.address,
-                'destination': ss58_encode(item.params[0]['value'], SUBSTRATE_ADDRESS_TYPE),
+                'destination': bech32.encode(HRP, bytes().fromhex(item.params[0]['value'])),
                 'destination_id': item.params[0]['value'].replace('0x', ''),
                 'value': item.params[1]['value'],
                 'success': item.success,
@@ -357,10 +360,10 @@ class AccountDetailResource(JSONAPIDetailResource):
         data = item.serialize()
         print(item.address)
         data['attributes']['free_balance'] = int(
-            substrate.get_Balance("tyee15c2cc2uj34w5jkfzxe4dndpnngprxe4nytaj9axmzf63ur4f8awq806lv6"), 16)
+            substrate.get_Balance("tyee1jfakj2rvqym79lmxcmjkraep6tn296deyspd9mkh467u4xgqt3cqkv6lyl"), 16)
 
         data['attributes']['nonce'] = int(
-            substrate.get_Nonce("tyee15c2cc2uj34w5jkfzxe4dndpnngprxe4nytaj9axmzf63ur4f8awq806lv6"), 16)
+            substrate.get_Nonce("tyee1jfakj2rvqym79lmxcmjkraep6tn296deyspd9mkh467u4xgqt3cqkv6lyl"), 16)
 
         return data
 
