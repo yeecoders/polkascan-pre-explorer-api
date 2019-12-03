@@ -28,6 +28,8 @@ from app.utils.ss58 import ss58_encode, ss58_encode_account_index
 from app.settings import LOG_TYPE_AUTHORITIESCHANGE, SUBSTRATE_ADDRESS_TYPE
 from app.utils import bech32
 from app.settings import HRP
+
+
 class Block(BaseModel):
     __tablename__ = 'data_block'
 
@@ -78,10 +80,11 @@ class Block(BaseModel):
     mpmr = sa.Column(sa.String(66), nullable=False)
     validators = sa.Column(sa.String(66), nullable=False)
     shard_num = sa.Column(sa.Integer(), index=True, primary_key=True)
-    reward = sa.Column(sa.String(66), nullable=False)
-    fee = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
 
-
+    reward_block_number = sa.Column(sa.Integer(), nullable=False)
+    coinbase = sa.Column(sa.String(66), nullable=False)
+    block_reward = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
+    fee_reward = sa.Column(sa.Numeric(precision=65, scale=0), nullable=False)
 
     @classmethod
     def get_head(cls, session):
@@ -167,8 +170,9 @@ class Event(BaseModel):
     attributes = sa.Column(sa.JSON())
 
     codec_error = sa.Column(sa.Boolean())
+
     def serialize_id(self):
-        return '{}-{}'.format(self.block_id, self.event_idx)
+        return '{}'.format(self.id)
 
     def serialize_formatting_hook(self, obj_dict):
 
@@ -177,12 +181,15 @@ class Event(BaseModel):
                 # SS58 format AccountId public keys
                 item['orig_value'] = item['value'].replace('0x', '')
                 item['value'] = bech32.encode(HRP, bytes().fromhex(item['value'].replace('0x', '')))
-           #bech32.encode(HRP, bytes().fromhex(item['value'].replace('0x', '')))
+            # bech32.encode(HRP, bytes().fromhex(item['value'].replace('0x', '')))
 
             elif item['type'] in ['AccountIndex'] and item['value']:
                 # SS58 format Account index
+                # {'type': 'AccountIndex', 'value': 9, 'valueRaw': '09000000'}
                 item['orig_value'] = item['value']
-                item['value'] = bech32.encode(HRP, bytes().fromhex(item['value']))
+                item['orig_value'] = item['value']
+                if not str(item['value']).isdigit():
+                    item['value'] = bech32.encode(HRP, bytes().fromhex(item['value']))
 
         return obj_dict
 
@@ -227,9 +234,11 @@ class Extrinsic(BaseModel):
 
     codec_error = sa.Column(sa.Boolean(), default=False)
     datetime = sa.Column(sa.DateTime(timezone=True))
+    origin_hash = sa.Column(sa.String(64), index=True, nullable=True)
+
 
     def serialize_id(self):
-        return '{}-{}'.format(self.block_id, self.extrinsic_idx)
+        return '{}'.format(self.id)
 
     def format_address(self, item):
         item['orig_value'] = item['value'].replace('0x', '')
@@ -240,13 +249,15 @@ class Extrinsic(BaseModel):
 
         if obj_dict['attributes'].get('address'):
             obj_dict['attributes']['address_id'] = obj_dict['attributes']['address'].replace('0x', '')
-            obj_dict['attributes']['address'] = bech32.encode(HRP, bytes().fromhex(obj_dict['attributes']['address'].replace('0x', '')))
+            obj_dict['attributes']['address'] = bech32.encode(HRP, bytes().fromhex(
+                obj_dict['attributes']['address'].replace('0x', '')))
 
         for item in obj_dict['attributes']['params']:
             # SS58 format Addresses public keys
             if item['type'] in ['Address', 'AccountId'] and item['value']:
                 self.format_address(item)
-            elif item['type'] in ['Vec<Address>', 'Vec<AccountId>', 'Vec<<Lookup as StaticLookup>::Source>'] and item['value']:
+            elif item['type'] in ['Vec<Address>', 'Vec<AccountId>', 'Vec<<Lookup as StaticLookup>::Source>'] and item[
+                'value']:
                 for idx, vec_item in enumerate(item['value']):
                     item['value'][idx] = {
                         'name': idx,
@@ -274,14 +285,15 @@ class Log(BaseModel):
     shard_num = sa.Column(sa.Integer(), index=True, primary_key=True)
 
     def serialize_id(self):
-        return '{}-{}'.format(self.block_id, self.log_idx)
+        return '{}'.format(self.id)
 
     def serialize_formatting_hook(self, obj_dict):
 
         if self.type_id == LOG_TYPE_AUTHORITIESCHANGE:
 
             for idx, item in enumerate(obj_dict['attributes']['data']['value']):
-                obj_dict['attributes']['data']['value'][idx] = bech32.encode(HRP, bytes().fromhex(item.replace('0x', '')))
+                obj_dict['attributes']['data']['value'][idx] = bech32.encode(HRP,
+                                                                             bytes().fromhex(item.replace('0x', '')))
         return obj_dict
 
 
@@ -300,7 +312,6 @@ class Account(BaseModel):
     updated_at_block = sa.Column(sa.Integer(), nullable=False)
     shard_num = sa.Column(sa.Integer(), index=True, nullable=False)
 
-
     def serialize_id(self):
         return self.address
 
@@ -318,23 +329,23 @@ class AccountAudit(BaseModel):
 
 
 data_session = sa.Table('data_session', BaseModel.metadata,
-    sa.Column('id', sa.Integer(), primary_key=True, autoincrement=False),
-    sa.Column('start_at_block', sa.Integer()),
-    sa.Column('era', sa.Integer()),
-    sa.Column('era_idx', sa.Integer()),
-    sa.Column('created_at_block', sa.Integer(), nullable=False),
-    sa.Column('created_at_extrinsic', sa.Integer()),
-    sa.Column('created_at_event', sa.Integer()),
-    sa.Column('count_validators', sa.Integer()),
-    sa.Column('count_nominators', sa.Integer())
-)
-
+                        sa.Column('id', sa.Integer(), primary_key=True, autoincrement=False),
+                        sa.Column('start_at_block', sa.Integer()),
+                        sa.Column('era', sa.Integer()),
+                        sa.Column('era_idx', sa.Integer()),
+                        sa.Column('created_at_block', sa.Integer(), nullable=False),
+                        sa.Column('created_at_extrinsic', sa.Integer()),
+                        sa.Column('created_at_event', sa.Integer()),
+                        sa.Column('count_validators', sa.Integer()),
+                        sa.Column('count_nominators', sa.Integer())
+                        )
 
 data_session_total = sa.Table('data_session_total', BaseModel.metadata,
-    sa.Column('id', sa.Integer(), sa.ForeignKey('data_session.id'), primary_key=True, autoincrement=False),
-    sa.Column('end_at_block', sa.Integer()),
-    sa.Column('count_blocks', sa.Integer())
-)
+                              sa.Column('id', sa.Integer(), sa.ForeignKey('data_session.id'), primary_key=True,
+                                        autoincrement=False),
+                              sa.Column('end_at_block', sa.Integer()),
+                              sa.Column('count_blocks', sa.Integer())
+                              )
 
 
 class Session(BaseModel):
@@ -380,20 +391,23 @@ class SessionValidator(BaseModel):
     def serialize_formatting_hook(self, obj_dict):
         obj_dict['attributes']['validator_stash_id'] = self.validator_stash
         if self.validator_stash:
-            obj_dict['attributes']['validator_stash'] = bech32.encode(HRP, bytes().fromhex(self.validator_stash.replace('0x', '')))
+            obj_dict['attributes']['validator_stash'] = bech32.encode(HRP, bytes().fromhex(
+                self.validator_stash.replace('0x', '')))
         else:
             obj_dict['attributes']['validator_stash'] = None
 
         obj_dict['attributes']['validator_controller_id'] = self.validator_controller
 
         if self.validator_controller:
-            obj_dict['attributes']['validator_controller'] =bech32.encode(HRP, bytes().fromhex(self.validator_controller.replace('0x', '')))
+            obj_dict['attributes']['validator_controller'] = bech32.encode(HRP, bytes().fromhex(
+                self.validator_controller.replace('0x', '')))
         else:
             obj_dict['attributes']['validator_controller'] = None
 
         obj_dict['attributes']['validator_session_id'] = self.validator_session
         if self.validator_session:
-            obj_dict['attributes']['validator_session'] = bech32.encode(HRP, bytes().fromhex(self.validator_session.replace('0x', '')))
+            obj_dict['attributes']['validator_session'] = bech32.encode(HRP, bytes().fromhex(
+                self.validator_session.replace('0x', '')))
         else:
             obj_dict['attributes']['validator_session'] = None
 
@@ -415,11 +429,13 @@ class SessionNominator(BaseModel):
 
     def serialize_formatting_hook(self, obj_dict):
         obj_dict['attributes']['nominator_stash_id'] = self.nominator_stash
-        obj_dict['attributes']['nominator_stash'] = bech32.encode(HRP, bytes().fromhex(self.nominator_stash.replace('0x', '')))
+        obj_dict['attributes']['nominator_stash'] = bech32.encode(HRP, bytes().fromhex(
+            self.nominator_stash.replace('0x', '')))
 
         if self.nominator_controller:
             obj_dict['attributes']['nominator_controller_id'] = self.nominator_controller
-            obj_dict['attributes']['nominator_controller'] = bech32.encode(HRP, bytes().fromhex(self.nominator_controller.replace('0x', '')))
+            obj_dict['attributes']['nominator_controller'] = bech32.encode(HRP, bytes().fromhex(
+                self.nominator_controller.replace('0x', '')))
 
         return obj_dict
 
@@ -553,8 +569,10 @@ class DemocracyVote(BaseModel):
     updated_at_block = sa.Column(sa.Integer(), nullable=False)
 
     def serialize_formatting_hook(self, obj_dict):
-        obj_dict['attributes']['vote_address'] = bech32.encode(HRP, bytes().fromhex(self.vote_account_id.replace('0x', '')))
-        obj_dict['attributes']['stash_address'] = bech32.encode(HRP, bytes().fromhex(self.stash_account_id.replace('0x', '')))
+        obj_dict['attributes']['vote_address'] = bech32.encode(HRP,
+                                                               bytes().fromhex(self.vote_account_id.replace('0x', '')))
+        obj_dict['attributes']['stash_address'] = bech32.encode(HRP, bytes().fromhex(
+            self.stash_account_id.replace('0x', '')))
         return obj_dict
 
 

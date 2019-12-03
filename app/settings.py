@@ -29,7 +29,7 @@ DB_CONNECTION = os.environ.get("DB_CONNECTION", "mysql+mysqlconnector://{}:{}@{}
     DB_USERNAME, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME
 ))
 
-SUBSTRATE_RPC_URL = os.environ.get("SUBSTRATE_RPC_URL", "http://127.0.0.1:10033/")
+SUBSTRATE_RPC_URL = os.environ.get("SUBSTRATE_RPC_URL", "http://3.1.169.4:9933/")
 SUBSTRATE_ADDRESS_TYPE = int(os.environ.get("SUBSTRATE_ADDRESS_TYPE", 42))
 SUBSTRATE_METADATA_VERSION = int(os.environ.get("SUBSTRATE_METADATA_VERSION", 3))
 

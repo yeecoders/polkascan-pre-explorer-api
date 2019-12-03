@@ -125,14 +125,14 @@ def decode(hrp: str, addr: str) -> Tuple[int, Bytes]:
     if hrpgot != hrp:
         raise Bech32DecodeError('Human readable part mismatch')
 
-    decoded = convertbits(data[1:], 5, 8, False)
+    decoded = convertbits(data, 5, 8, False)
     if decoded is None or len(decoded) < 2:
         raise Bech32DecodeError('Witness programm too short')
     elif len(decoded) > 40:
         raise Bech32DecodeError('Witness programm too long')
 
-    if data[0] > 16:
-        raise Bech32DecodeError('Invalid witness version')
+    # if data[0] > 16:
+    #     raise Bech32DecodeError('Invalid witness version')
 
     if data[0] == 0 and (len(decoded) not in (20, 32)):
         raise Bech32DecodeError('Could not interpret witness programm')
@@ -155,11 +155,11 @@ class TestBech32(unittest.TestCase):
     def test_bech32_encode(self):
         #       #tyee1jfakj2rvqym79lmxcmjkraep6tn296deyspd9mkh467u4xgqt3cqkv6lyl
         address = encode(self.hrp,  bytes().fromhex('927b69286c0137e2ff66c6e561f721d2e6a2e9b92402d2eed7aebdca99005c70'))
-        print(address)
+
         self.assertEqual(address, 'tyee1jfakj2rvqym79lmxcmjkraep6tn296deyspd9mkh467u4xgqt3cqkv6lyl')
 
     def test_bech32_decode(self):
         address = 'tyee1jfakj2rvqym79lmxcmjkraep6tn296deyspd9mkh467u4xgqt3cqkv6lyl'
-        old = decode(self.hrp, address)
-        print(old)
-        self.assertEqual('927b69286c0137e2ff66c6e561f721d2e6a2e9b92402d2eed7aebdca99005c70', old)
+        bytearray = decode(self.hrp, address)
+        print(bytes(bytearray[1]).hex())
+        self.assertEqual('927b69286c0137e2ff66c6e561f721d2e6a2e9b92402d2eed7aebdca99005c70', bytes(bytearray[1]).hex())

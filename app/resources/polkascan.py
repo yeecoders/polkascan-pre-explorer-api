@@ -55,20 +55,25 @@ class BlockDetailsResource(JSONAPIDetailResource):
         relationships = {}
 
         if 'extrinsics' in include_list:
-            relationships['extrinsics'] = Extrinsic.query(self.session).filter_by(block_id=item.id).order_by(
+            relationships['extrinsics'] = Extrinsic.query(self.session).filter_by(block_id=item.bid,
+                                                                                  shard_num=item.shard_num).order_by(
                 'extrinsic_idx')
         if 'transactions' in include_list:
-            relationships['transactions'] = Extrinsic.query(self.session).filter_by(block_id=item.id,
-                                                                                    signed=1).order_by(
+            relationships['transactions'] = Extrinsic.query(self.session).filter_by(block_id=item.bid,
+                                                                                    signed=1,
+                                                                                    shard_num=item.shard_num).order_by(
                 'extrinsic_idx')
         if 'inherents' in include_list:
-            relationships['inherents'] = Extrinsic.query(self.session).filter_by(block_id=item.id, signed=0).order_by(
+            relationships['inherents'] = Extrinsic.query(self.session).filter_by(block_id=item.bid, signed=0,
+                                                                                 shard_num=item.shard_num).order_by(
                 'extrinsic_idx')
         if 'events' in include_list:
-            relationships['events'] = Event.query(self.session).filter_by(block_id=item.id, system=0).order_by(
+            relationships['events'] = Event.query(self.session).filter_by(block_id=item.bid, system=0,
+                                                                          shard_num=item.shard_num).order_by(
                 'event_idx')
         if 'logs' in include_list:
-            relationships['logs'] = Log.query(self.session).filter_by(block_id=item.id).order_by(
+            relationships['logs'] = Log.query(self.session).filter_by(block_id=item.bid,
+                                                                      shard_num=item.shard_num).order_by(
                 'log_idx')
 
         return relationships
@@ -104,6 +109,7 @@ class ExtrinsicListResource(JSONAPIListResource):
         )
 
     def apply_filters(self, query, params):
+        print('ExtrinsicListResource apply_filters== {} '.format(params.get('filter[address]')))
 
         if params.get('filter[signed]'):
             query = query.filter_by(signed=params.get('filter[signed]'))
@@ -115,10 +121,7 @@ class ExtrinsicListResource(JSONAPIListResource):
             query = query.filter_by(call_id=params.get('filter[call_id]'))
 
         if params.get('filter[address]'):
-            # if len(params.get('filter[address]')) == 64:
-            account_id = params.get('filter[address]')
-            # else:
-            #     account_id = ss58_decode(params.get('filter[address]'), SUBSTRATE_ADDRESS_TYPE)
+            account_id = bytes(bech32.decode(HRP, params.get('filter[address]'))[1]).hex()
 
             query = query.filter_by(address=account_id)
 
@@ -131,11 +134,13 @@ class ExtrinsicDetailResource(JSONAPIDetailResource):
         return 'extrinsic_id'
 
     def get_item(self, item_id):
+        print(item_id)
 
         if item_id[0:2] == '0x':
             extrinsic = Extrinsic.query(self.session).filter_by(extrinsic_hash=item_id[2:]).first()
         else:
-            extrinsic = Extrinsic.query(self.session).get(item_id.split('-'))
+            extrinsic = Extrinsic.query(self.session).filter_by(id=item_id).first()
+            # extrinsic = Extrinsic.query(self.session).get(item_id.split('-'))
 
         return extrinsic
 
@@ -164,7 +169,9 @@ class EventDetailResource(JSONAPIDetailResource):
         return 'event_id'
 
     def get_item(self, item_id):
-        return Event.query(self.session).get(item_id.split('-'))
+        return Event.query(self.session).filter_by(id=item_id.split('-')[0]).first()
+
+    # return Event.query(self.session).get(item_id.split('-'))
 
 
 class LogListResource(JSONAPIListResource):
@@ -178,7 +185,9 @@ class LogListResource(JSONAPIListResource):
 class LogDetailResource(JSONAPIDetailResource):
 
     def get_item(self, item_id):
-        return Log.query(self.session).get(item_id.split('-'))
+        return Log.query(self.session).filter_by(id=item_id.split('-')[0]).first()
+
+        # return Log.query(self.session).get(item_id.split('-'))
 
 
 class NetworkStatisticsResource(JSONAPIResource):
@@ -254,20 +263,19 @@ class NetworkStatisticsResource(JSONAPIResource):
 
 
 class BalanceTransferListResource(JSONAPIListResource):
-
     def get_query(self):
-        return Extrinsic.query(self.session).filter(
-            Extrinsic.module_id == 'balances' and Extrinsic.call_id == 'transfer'
-        ).order_by(Extrinsic.block_id.desc())
+        return Extrinsic.query(self.session).filter_by(module_id='balances', call_id='transfer').order_by(
+            Extrinsic.block_id.desc())
 
     def apply_filters(self, query, params):
         if params.get('filter[address]'):
-            # if len(params.get('filter[address]')) == 64:
-            account_id = params.get('filter[address]')
-            # else:
-            #     account_id = ss58_decode(params.get('filter[address]'), SUBSTRATE_ADDRESS_TYPE)
+            account_id = bytes(bech32.decode(HRP, params.get('filter[address]'))[1]).hex()
+
+            print('BalanceTransferListResource apply_filters== {} '.format(account_id))
 
             query = query.filter_by(address=account_id)
+        if params.get('filter[call_id]'):
+            query = query.filter_by(call_id=params.get('filter[call_id]'))
 
         if params.get('filter[success]'):
             query = query.filter_by(success=True)
@@ -278,18 +286,24 @@ class BalanceTransferListResource(JSONAPIListResource):
         return query
 
     def serialize_item(self, item):
+        if item.address is None:
+            sender = ''
+        else:
+            sender = bech32.encode(HRP, bytes().fromhex(item.address))
+
         return {
             'type': 'balancetransfer',
             'id': item.extrinsic_hash,
             'attributes': {
                 'block_id': item.block_id,
                 'extrinsic_hash': item.extrinsic_hash,
-                'sender': bech32.encode(HRP, bytes().fromhex(item.address)),
+                'sender': sender,
                 'sender_id': item.address,
                 'destination': bech32.encode(HRP, bytes().fromhex(item.params[0]['value'])),
-                'destination': 'G99',
-                'destination_id': '3',
-                'value': '2',
+                'destination_id': item.params[0]['value'].replace('0x', ''),
+                'value': item.params[1]['value'],
+                'shard_num': item.shard_num,
+                'call_id': item.call_id,
                 'success': item.success,
                 'error': item.error,
                 'datetime': datetime.strftime(item.datetime, '%Y-%m-%d %H:%M:%S')
@@ -316,6 +330,7 @@ class BalanceTransferDetailResource(JSONAPIDetailResource):
                 'destination': bech32.encode(HRP, bytes().fromhex(item.params[0]['value'])),
                 'destination_id': item.params[0]['value'].replace('0x', ''),
                 'value': item.params[1]['value'],
+                'shard_num': item.shard_num,
                 'success': item.success,
                 'error': item.error,
             }
@@ -340,10 +355,26 @@ class AccountDetailResource(JSONAPIDetailResource):
         super(AccountDetailResource, self).__init__()
 
     def get_item(self, item_id):
-        return Account.query(self.session).filter_by(address=item_id).first()
+        account = Account.query(self.session).filter_by(address=item_id).first()
+        #  account = Account(
+        #      is_reaped=0,
+        #      address=item_id,
+        #      id=bytes(bech32.decode(HRP, item_id)[1]).hex(),
+        #      shard_num=0,
+        #      is_validator=1,
+        #      is_contract=1,
+        #      count_reaped=1,
+        #      balance=0,
+        #      created_at_block=31,
+        #      updated_at_block=31,
+        #  )
+
+        return account
 
     def get_relationships(self, include_list, item):
         relationships = {}
+
+        print('account relationships== {} '.format(item.id))
 
         if 'recent_extrinsics' in include_list:
             relationships['recent_extrinsics'] = Extrinsic.query(self.session).filter_by(
@@ -358,7 +389,6 @@ class AccountDetailResource(JSONAPIDetailResource):
     def serialize_item(self, item):
         substrate = SubstrateInterface(SUBSTRATE_RPC_URL, metadata_version=SUBSTRATE_METADATA_VERSION)
         data = item.serialize()
-        print(item.address)
         data['attributes']['free_balance'] = int(
             substrate.get_Balance("tyee1jfakj2rvqym79lmxcmjkraep6tn296deyspd9mkh467u4xgqt3cqkv6lyl"), 16)
 
