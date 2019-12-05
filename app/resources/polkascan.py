@@ -344,6 +344,20 @@ class AccountResource(JSONAPIListResource):
             Account.updated_at_block.desc()
         )
 
+    def serialize_item(self, item):
+        substrate = SubstrateInterface(SUBSTRATE_RPC_URL, metadata_version=SUBSTRATE_METADATA_VERSION)
+
+        return {
+            'type': 'account',
+            'id': item.address,
+            'attributes': {
+                'id': item.id,
+                'address': item.address,
+                'balance': int(substrate.get_Balance(item.address), 16),
+                'shard_num': item.shard_num
+            }
+        }
+
 
 class AccountDetailResource(JSONAPIDetailResource):
     cache_expiration_time = 6
@@ -390,10 +404,10 @@ class AccountDetailResource(JSONAPIDetailResource):
         substrate = SubstrateInterface(SUBSTRATE_RPC_URL, metadata_version=SUBSTRATE_METADATA_VERSION)
         data = item.serialize()
         data['attributes']['free_balance'] = int(
-            substrate.get_Balance("tyee1jfakj2rvqym79lmxcmjkraep6tn296deyspd9mkh467u4xgqt3cqkv6lyl"), 16)
+            substrate.get_Balance(item.address), 16)
 
         data['attributes']['nonce'] = int(
-            substrate.get_Nonce("tyee1jfakj2rvqym79lmxcmjkraep6tn296deyspd9mkh467u4xgqt3cqkv6lyl"), 16)
+            substrate.get_Nonce(item.address), 16)
 
         return data
 
