@@ -134,15 +134,21 @@ class ExtrinsicDetailResource(JSONAPIDetailResource):
         return 'extrinsic_id'
 
     def get_item(self, item_id):
-        print(item_id)
+
+        if len(item_id) < 10:
+            return Extrinsic.query(self.session).filter_by(id=item_id).first()
+        if 'origin-' in item_id:
+            if '0x' in item_id:
+                return Extrinsic.query(self.session).filter_by(origin_hash=item_id[9:]).first()
+            else:
+                return Extrinsic.query(self.session).filter_by(origin_hash=item_id[7:]).first()
 
         if item_id[0:2] == '0x':
-            extrinsic = Extrinsic.query(self.session).filter_by(extrinsic_hash=item_id[2:]).first()
+            return Extrinsic.query(self.session).filter_by(extrinsic_hash=item_id[2:]).first()
         else:
-            extrinsic = Extrinsic.query(self.session).filter_by(id=item_id).first()
-            # extrinsic = Extrinsic.query(self.session).get(item_id.split('-'))
+            return Extrinsic.query(self.session).filter_by(extrinsic_hash=item_id).first()
 
-        return extrinsic
+
 
 
 class EventsListResource(JSONAPIListResource):
