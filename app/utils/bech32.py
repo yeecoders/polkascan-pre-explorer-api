@@ -150,12 +150,13 @@ class Bech32DecodeError(Exception):
 
 
 class TestBech32(unittest.TestCase):
-    hrp = 'tyee'
+    hrp = 'yee'
 
     def test_bech32_encode(self):
         #       #tyee1jfakj2rvqym79lmxcmjkraep6tn296deyspd9mkh467u4xgqt3cqkv6lyl
-        address = encode(self.hrp,  bytes().fromhex('927b69286c0137e2ff66c6e561f721d2e6a2e9b92402d2eed7aebdca99005c70'))
-
+        address = encode(self.hrp, bytes().fromhex(
+            '40e17c894e03256ea7cb671d79bcc88276c3fd6e6a05e9c0a9546c228d1f4955d8f18e85255020c97764251977b77f3b9e18f4d6de7b62522ab29a49cede669f'))
+        print(address)
         self.assertEqual(address, 'tyee1jfakj2rvqym79lmxcmjkraep6tn296deyspd9mkh467u4xgqt3cqkv6lyl')
 
     def test_bech32_decode(self):

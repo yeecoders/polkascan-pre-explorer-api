@@ -33,7 +33,8 @@ from app.utils.ss58 import ss58_decode, ss58_encode
 from scalecodec.base import RuntimeConfiguration
 from substrateinterface import SubstrateInterface
 from app.utils import bech32
-
+from datetime import datetime, timedelta, timezone
+import time
 
 class BlockDetailsResource(JSONAPIDetailResource):
 
@@ -297,6 +298,8 @@ class BalanceTransferListResource(JSONAPIListResource):
         else:
             sender = bech32.encode(HRP, bytes().fromhex(item.address))
 
+        dt = datetime.fromtimestamp(time.mktime(item.datetime.timetuple()), timezone(timedelta(hours=8)))
+
         return {
             'type': 'balancetransfer',
             'id': item.extrinsic_hash,
@@ -312,7 +315,7 @@ class BalanceTransferListResource(JSONAPIListResource):
                 'call_id': item.call_id,
                 'success': item.success,
                 'error': item.error,
-                'datetime': datetime.strftime(item.datetime, '%Y-%m-%d %H:%M:%S')
+                'datetime': datetime.strftime(dt, '%Y-%m-%d %H:%M:%S')
             }
         }
 
@@ -324,6 +327,9 @@ class BalanceTransferDetailResource(JSONAPIDetailResource):
             return Extrinsic.query(self.session).filter_by(extrinsic_hash=item_id[2:]).first()
 
     def serialize_item(self, item):
+
+        dt = datetime.fromtimestamp(time.mktime(item.datetime.timetuple()), timezone(timedelta(hours=8)))
+        print(type(dt),dt)
         return {
             'type': 'balancetransfer',
             'id': item.extrinsic_hash,
@@ -339,6 +345,7 @@ class BalanceTransferDetailResource(JSONAPIDetailResource):
                 'shard_num': item.shard_num,
                 'success': item.success,
                 'error': item.error,
+                'datetime': datetime.strftime(dt, '%Y-%m-%d %H:%M:%S')
             }
         }
 
