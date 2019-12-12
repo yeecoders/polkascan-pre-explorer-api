@@ -36,6 +36,7 @@ from app.utils import bech32
 from datetime import datetime, timedelta, timezone
 import time
 
+
 class BlockDetailsResource(JSONAPIDetailResource):
 
     def get_item_url_name(self):
@@ -136,6 +137,11 @@ class ExtrinsicDetailResource(JSONAPIDetailResource):
 
     def get_item(self, item_id):
 
+        if 'origin-' not in item_id and '-' in item_id:
+            st = item_id.split("-")
+            return Extrinsic.query(self.session).filter_by(extrinsic_idx=int(st[2]), block_id=int(st[1]),
+                                                       shard_num=int(st[0])).first()
+
         if len(item_id) < 10:
             return Extrinsic.query(self.session).filter_by(id=item_id).first()
         if 'origin-' in item_id:
@@ -165,9 +171,7 @@ class EventsListResource(JSONAPIListResource):
         return query
 
     def get_query(self):
-        return Event.query(self.session).filter(Event.system == True).order_by(
-            Event.block_id.desc()
-        )
+        return Event.query(self.session).order_by(Event.block_id.desc())
 
 
 class EventDetailResource(JSONAPIDetailResource):
@@ -176,7 +180,13 @@ class EventDetailResource(JSONAPIDetailResource):
         return 'event_id'
 
     def get_item(self, item_id):
-        return Event.query(self.session).filter_by(id=item_id.split('-')[0]).first()
+        if '-' in item_id:
+            st = item_id.split("-")
+            return Event.query(self.session).filter_by(event_idx=int(st[2]), block_id=int(st[1]),
+                                                     shard_num=int(st[0])).first()
+
+        else:
+            return Event.query(self.session).filter_by(id=item_id.split('-')[0]).first()
 
     # return Event.query(self.session).get(item_id.split('-'))
 
@@ -192,7 +202,13 @@ class LogListResource(JSONAPIListResource):
 class LogDetailResource(JSONAPIDetailResource):
 
     def get_item(self, item_id):
-        return Log.query(self.session).filter_by(id=item_id.split('-')[0]).first()
+        if '-' in item_id:
+            st = item_id.split("-")
+            return Log.query(self.session).filter_by(log_idx=int(st[2]), block_id=int(st[1]),
+                                                     shard_num=int(st[0])).first()
+
+        else:
+            return Log.query(self.session).filter_by(id=item_id.split('-')[0]).first()
 
         # return Log.query(self.session).get(item_id.split('-'))
 
@@ -327,9 +343,8 @@ class BalanceTransferDetailResource(JSONAPIDetailResource):
             return Extrinsic.query(self.session).filter_by(extrinsic_hash=item_id[2:]).first()
 
     def serialize_item(self, item):
-
         dt = datetime.fromtimestamp(time.mktime(item.datetime.timetuple()), timezone(timedelta(hours=8)))
-        print(type(dt),dt)
+        print(type(dt), dt)
         return {
             'type': 'balancetransfer',
             'id': item.extrinsic_hash,
