@@ -111,7 +111,6 @@ class ExtrinsicListResource(JSONAPIListResource):
         )
 
     def apply_filters(self, query, params):
-        print('ExtrinsicListResource apply_filters== {} '.format(params.get('filter[address]')))
 
         if params.get('filter[signed]'):
             query = query.filter_by(signed=params.get('filter[signed]'))
@@ -171,7 +170,7 @@ class EventsListResource(JSONAPIListResource):
         return query
 
     def get_query(self):
-        return Event.query(self.session).order_by(Event.block_id.desc())
+        return Event.query(self.session).order_by(Event.id.desc())
 
 
 class EventDetailResource(JSONAPIDetailResource):
@@ -294,8 +293,6 @@ class BalanceTransferListResource(JSONAPIListResource):
         if params.get('filter[address]'):
             account_id = bytes(bech32.decode(HRP, params.get('filter[address]'))[1]).hex()
 
-            print('BalanceTransferListResource apply_filters== {} '.format(account_id))
-
             query = query.filter_by(address=account_id)
         if params.get('filter[call_id]'):
             query = query.filter_by(call_id=params.get('filter[call_id]'))
@@ -397,7 +394,8 @@ class AccountDetailResource(JSONAPIDetailResource):
         super(AccountDetailResource, self).__init__()
 
     def get_item(self, item_id):
-        account = Account.query(self.session).filter_by(address=item_id).first()
+        account_id = bytes(bech32.decode(HRP, item_id)[1]).hex()
+        account = Account.query(self.session).filter_by(id=account_id).first()
         #  account = Account(
         #      is_reaped=0,
         #      address=item_id,
@@ -416,8 +414,6 @@ class AccountDetailResource(JSONAPIDetailResource):
     def get_relationships(self, include_list, item):
         relationships = {}
 
-        print('account relationships== {} '.format(item.id))
-
         if 'recent_extrinsics' in include_list:
             relationships['recent_extrinsics'] = Extrinsic.query(self.session).filter_by(
                 address=item.id).order_by(Extrinsic.block_id.desc())[:10]
@@ -429,13 +425,15 @@ class AccountDetailResource(JSONAPIDetailResource):
         return relationships
 
     def serialize_item(self, item):
+        address = bech32.encode(HRP, bytes().fromhex(item.id))
+
         substrate = SubstrateInterface(SUBSTRATE_RPC_URL, metadata_version=SUBSTRATE_METADATA_VERSION)
         data = item.serialize()
         data['attributes']['free_balance'] = int(
-            substrate.get_Balance(item.address), 16)
+            substrate.get_Balance(address), 16)
 
         data['attributes']['nonce'] = int(
-            substrate.get_Nonce(item.address), 16)
+            substrate.get_Nonce(address), 16)
 
         return data
 

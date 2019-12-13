@@ -34,7 +34,7 @@ SUBSTRATE_ADDRESS_TYPE = int(os.environ.get("SUBSTRATE_ADDRESS_TYPE", 42))
 SUBSTRATE_METADATA_VERSION = int(os.environ.get("SUBSTRATE_METADATA_VERSION", 3))
 
 TYPE_REGISTRY = os.environ.get("TYPE_REGISTRY", "default")
-HRP = os.environ.get("HRP", "yee")
+HRP = os.environ.get("HRP", "tyee")
 
 DOGPILE_CACHE_SETTINGS = {
 
