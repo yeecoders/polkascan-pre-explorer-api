@@ -14,9 +14,9 @@ if [ "$ENVIRONMENT" = "dev" ]; then
     # Expand path to local versions of packages
     export PYTHONPATH=$PYTHONPATH:./py-substrate-interface/:./py-scale-codec/
 
-    gunicorn -b 0.0.0.0:8000 --workers=1 app.main:app --reload --timeout 600
+    gunicorn -b 0.0.0.0:8001 --workers=1 app.main:app --reload --timeout 600
 fi
 
 if [ "$ENVIRONMENT" = "prod" ]; then
-    gunicorn -b 0.0.0.0:8000 --workers=5 app.main:app --worker-class="egg:meinheld#gunicorn_worker"
+    gunicorn -b 0.0.0.0:8001 --workers=5 app.main:app --worker-class="egg:meinheld#gunicorn_worker"
 fi
