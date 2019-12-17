@@ -21,7 +21,7 @@ import os
 
 DB_NAME = os.environ.get("DB_NAME", "polkascan")
 DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
-DB_PORT = os.environ.get("DB_PORT", 33061)
+DB_PORT = os.environ.get("DB_PORT", 3306)
 DB_USERNAME = os.environ.get("DB_USERNAME", "root")
 DB_PASSWORD = os.environ.get("DB_PASSWORD", "root")
 
@@ -40,7 +40,7 @@ DOGPILE_CACHE_SETTINGS = {
 
     'default_list_cache_expiration_time': 6,
     'default_detail_cache_expiration_time': 3600,
-    'host': os.environ.get("DOGPILE_CACHE_HOST", "127.0.0.1"),
+    'host': os.environ.get("DOGPILE_CACHE_HOST", "redis"),
     'port': os.environ.get("DOGPILE_CACHE_HOST", 6379),
     'db': os.environ.get("DOGPILE_CACHE_DB", 10)
 }
