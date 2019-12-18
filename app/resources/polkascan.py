@@ -213,14 +213,12 @@ class LogDetailResource(JSONAPIDetailResource):
 
     def serialize_item(self, item):
         typeshow = item.data['type']
-        if typeshow is None:
-            typeshow = 'Finalitytracker'
-        elif typeshow == '(ConsensusEngineId, Vec<u8>)':
+
+        if typeshow == '(ConsensusEngineId, Vec<u8>)':
             typeshow = 'Consensus'
         elif typeshow == 'ShardInfo<ShardNum>':
             typeshow = 'ShardInfo'
-        elif typeshow == 'Finalitytrack':
-            typeshow = 'Crfg'
+
         print(typeshow)
         return {
             'type': 'log',
