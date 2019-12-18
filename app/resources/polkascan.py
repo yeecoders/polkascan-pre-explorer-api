@@ -211,6 +211,32 @@ class LogDetailResource(JSONAPIDetailResource):
 
         # return Log.query(self.session).get(item_id.split('-'))
 
+    def serialize_item(self, item):
+        typeshow = item.data['type']
+        if typeshow is None:
+            typeshow = 'Finalitytracker'
+        elif typeshow == '(ConsensusEngineId, Vec<u8>)':
+            typeshow = 'Consensus'
+        elif typeshow == 'ShardInfo<ShardNum>':
+            typeshow = 'ShardInfo'
+        elif typeshow == 'Finalitytrack':
+            typeshow = 'Crfg'
+        print(typeshow)
+        return {
+            'type': 'log',
+            'id': item.id,
+            'attributes': {
+                'id': item.id,
+                'block_id': item.block_id,
+                'log_idx': item.log_idx,
+                'type_id': item.type_id,
+                'type': item.type,
+                'data': item.data,
+                'typeshow':typeshow,
+                'shard_num': item.shard_num
+            }
+        }
+
 
 class NetworkStatisticsResource(JSONAPIResource):
     cache_expiration_time = 6
