@@ -265,9 +265,14 @@ class NetworkStatisticsResource(JSONAPIResource):
             # total_events = Event.query(self.session).count()
             event = Event.query(self.session).filter_by(
                 id=self.session.query(func.max(Event.id)).one()[0]).first()
+            if event is None:
+                  eventid=0
+            else:
+                eventid=event.id
+
             if best_block:
                 substrate = SubstrateInterface(SUBSTRATE_RPC_URL, metadata_version=SUBSTRATE_METADATA_VERSION)
-
+                print(substrate.get_ShardCount())
                 response = self.get_jsonapi_response(
                     data={
                         'type': 'networkstats',
@@ -275,7 +280,7 @@ class NetworkStatisticsResource(JSONAPIResource):
                         'attributes': {
                             'best_block': best_block.id,
                             'total_signed_extrinsics': total_signed_extrinsics,
-                            'total_events': event.id,
+                            'total_events': eventid,
                             'total_events_module': int(best_block.id),
                             'total_blocks': 'N/A',
                             'total_accounts': total_accounts,
@@ -334,9 +339,11 @@ class BalanceTransferListResource(JSONAPIListResource):
             sender = ''
         else:
             sender = bech32.encode(HRP, bytes().fromhex(item.address))
-
-        dt = datetime.fromtimestamp(time.mktime(item.datetime.timetuple()), timezone(timedelta(hours=8)))
-
+        if item.datetime is not None:
+            dt = datetime.fromtimestamp(time.mktime(item.datetime.timetuple()), timezone(timedelta(hours=8)))
+            it = datetime.strftime(dt, '%Y-%m-%d %H:%M:%S')
+        else:
+            it = ''
         return {
             'type': 'balancetransfer',
             'id': item.extrinsic_hash,
@@ -352,7 +359,7 @@ class BalanceTransferListResource(JSONAPIListResource):
                 'call_id': item.call_id,
                 'success': item.success,
                 'error': item.error,
-                'datetime': datetime.strftime(dt, '%Y-%m-%d %H:%M:%S')
+                'datetime': it
             }
         }
 
@@ -364,8 +371,13 @@ class BalanceTransferDetailResource(JSONAPIDetailResource):
             return Extrinsic.query(self.session).filter_by(extrinsic_hash=item_id[2:]).first()
 
     def serialize_item(self, item):
-        dt = datetime.fromtimestamp(time.mktime(item.datetime.timetuple()), timezone(timedelta(hours=8)))
-        print(type(dt), dt)
+        print(item.success)
+        if item.datetime is not None:
+            dt = datetime.fromtimestamp(time.mktime(item.datetime.timetuple()), timezone(timedelta(hours=8)))
+            it = datetime.strftime(dt, '%Y-%m-%d %H:%M:%S')
+        else:
+            it = ''
+
         return {
             'type': 'balancetransfer',
             'id': item.extrinsic_hash,
@@ -381,7 +393,7 @@ class BalanceTransferDetailResource(JSONAPIDetailResource):
                 'shard_num': item.shard_num,
                 'success': item.success,
                 'error': item.error,
-                'datetime': datetime.strftime(dt, '%Y-%m-%d %H:%M:%S')
+                'datetime': it
             }
         }
 
