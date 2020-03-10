@@ -59,6 +59,7 @@ health = health.Health()
 
 # Application routes
 app.add_route('/health', health)
+app.add_route('/asset', polkascan.AssetListResource())
 app.add_route('/block', polkascan.BlockListResource())
 app.add_route('/block/{block_id}', polkascan.BlockDetailsResource())
 app.add_route('/block-total', polkascan.BlockTotalListResource())

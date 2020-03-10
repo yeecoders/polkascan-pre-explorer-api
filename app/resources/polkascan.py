@@ -35,6 +35,7 @@ from substrateinterface import SubstrateInterface
 from app.utils import bech32
 from datetime import datetime, timedelta, timezone
 import time
+import math
 
 
 class BlockDetailsResource(JSONAPIDetailResource):
@@ -87,7 +88,27 @@ class BlockListResource(JSONAPIListResource):
         return Block.query(self.session).order_by(
             Block.id.desc()
         )
+class AssetListResource(JSONAPIListResource):
+    def apply_filters(self, query, params):
+        return query.filter_by(module_id='assets', event_id='issued')
 
+
+    def get_query(self):
+        return Event.query(self.session).order_by(Event.id.desc())
+
+    # def serialize_item(self, item):
+    #     return {
+    #         'type': 'asset',
+    #         'id': '',
+    #         'attributes': {
+    #             'id': '100',
+    #             'decimals': '6',
+    #             'issuer': 'tyee1jfakj2rvqym79lmxcmjkraep6tn296deyspd9mkh467u4xgqt3cqkv6lyl',
+    #             'name': 'yee-token',
+    #             'shard_code': '05cr',
+    #             'total_supply': '123434'
+    #         }
+    #     }
 
 class BlockTotalDetailsResource(JSONAPIDetailResource):
 
@@ -188,6 +209,44 @@ class EventDetailResource(JSONAPIDetailResource):
             return Event.query(self.session).filter_by(id=item_id.split('-')[0]).first()
 
     # return Event.query(self.session).get(item_id.split('-'))
+
+    def serialize_item(self, item):
+        if item.module_id == 'assets' and item.event_id == 'Issued':
+            json_dic = [{"type": "AssetDetail", "value": {"shard_code": '', "id": '',
+                         "name": '', "issuer": '', "decimals": '',"total_supply": ''}, "valueRaw": ""}]
+            json_str = json_dic[0]['value']
+            shard_code_hex = item.attributes[0]['valueRaw'].upper()
+            shard_code_10 = int(shard_code_hex.upper(), 16)
+            shard_code_2 = str(bin(shard_code_10))
+            shard_count = 4
+            shard_num_2 = shard_code_2[-int(math.log2(shard_count)):]
+            shard_num = int(shard_num_2, 2)
+            print(shard_num)
+            json_str['shard_code'] = item.attributes[0]['valueRaw']
+            json_str['id'] = item.attributes[1]['value']
+            json_str['name'] = item.attributes[2]['value']
+            json_str['issuer'] = bech32.encode(HRP, bytes().fromhex(item.attributes[3]['value'].replace('0x', '')))
+            json_str['decimals'] = item.attributes[5]['value']
+            json_str['total_supply'] = item.attributes[4]['value']
+
+        return {
+            'type': 'event',
+            'id': item.id,
+            'attributes': {
+                'id': item.id,
+                'block_id': item.block_id,
+                'event_idx': item.event_idx,
+                'extrinsic_idx': item.extrinsic_idx,
+                'type': item.type,
+                'module_id': item.module_id,
+                'event_id': item.event_id,
+                'system': item.system,
+                'module': item.module,
+                'phase': item.module,
+                'attributes': json_dic,
+                'shard_num': item.shard_num
+            }
+        }
 
 
 class LogListResource(JSONAPIListResource):
