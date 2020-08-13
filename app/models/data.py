@@ -204,6 +204,7 @@ class Extrinsic(BaseModel):
                          primaryjoin=block_id == Block.bid and shard_num == Block.shard_num)
     extrinsic_idx = sa.Column(sa.Integer(), primary_key=True, index=True)
     extrinsic_hash = sa.Column(sa.String(64), index=True, nullable=True)
+    extrinsic = sa.Column(sa.String(1024), index=True)
 
     extrinsic_length = sa.Column(sa.String(10))
     extrinsic_version = sa.Column(sa.String(2))
@@ -215,6 +216,7 @@ class Extrinsic(BaseModel):
 
     address_length = sa.Column(sa.String(2))
     address = sa.Column(sa.String(64), index=True)
+    dest = sa.Column(sa.String(64), index=True)
     account_index = sa.Column(sa.String(16), index=True)
     account_idx = sa.Column(sa.Integer(), index=True)
     signature = sa.Column(sa.String(128))

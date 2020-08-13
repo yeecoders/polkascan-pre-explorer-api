@@ -59,7 +59,7 @@ class JSONAPIResource(BaseResource):
             'meta': {
                 "authors": [
                     "WEB3SCAN",
-                    "POLKASCAN",
+                    "YEESCAN",
                     "openAware BV"
                 ]
             },

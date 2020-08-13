@@ -20,14 +20,14 @@
 import logging
 import falcon
 from dogpile.cache.api import NO_VALUE
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from datetime import datetime
 from app.models.data import Block, Extrinsic, Event, RuntimeCall, RuntimeEvent, Runtime, RuntimeModule, \
     RuntimeCallParam, RuntimeEventAttribute, RuntimeType, RuntimeStorage, Account, Session, DemocracyProposal, Contract, \
     BlockTotal, SessionValidator, Log, DemocracyReferendum, AccountIndex, RuntimeConstant, SessionNominator, \
     DemocracyVote
 from app.resources.base import JSONAPIResource, JSONAPIListResource, JSONAPIDetailResource
-from app.settings import SUBSTRATE_RPC_URL, SUBSTRATE_METADATA_VERSION, SUBSTRATE_ADDRESS_TYPE, TYPE_REGISTRY, HRP
+from app.settings import SHARDS_TABLE, SUBSTRATE_RPC_URL, SUBSTRATE_METADATA_VERSION, SUBSTRATE_ADDRESS_TYPE, TYPE_REGISTRY, HRP
 from app.type_registry import load_type_registry
 from app.utils.ss58 import ss58_decode, ss58_encode
 from scalecodec.base import RuntimeConfiguration
@@ -211,6 +211,7 @@ class EventDetailResource(JSONAPIDetailResource):
     # return Event.query(self.session).get(item_id.split('-'))
 
     def serialize_item(self, item):
+        json_dic = []
         if item.module_id == 'assets' and item.event_id == 'Issued':
             json_dic = [{"type": "AssetDetail", "value": {"shard_code": '', "id": '',
                          "name": '', "issuer": '', "decimals": '',"total_supply": ''}, "valueRaw": ""}]
@@ -271,7 +272,10 @@ class LogDetailResource(JSONAPIDetailResource):
         # return Log.query(self.session).get(item_id.split('-'))
 
     def serialize_item(self, item):
-        typeshow = item.data['type']
+        if item.log_idx ==1:
+            typeshow = 'Other'
+        else:
+            typeshow = item.data['type']
 
         if typeshow == '(ConsensusEngineId, Vec<u8>)':
             typeshow = 'Consensus'
@@ -371,17 +375,72 @@ class NetworkStatisticsResource(JSONAPIResource):
 
         resp.media = response
 
+class FinalizedHeadListResource(JSONAPIResource):
+    cache_expiration_time = 26
+
+    def on_get(self, req, resp, network_id=None):
+        resp.status = falcon.HTTP_200
+
+        # TODO make caching more generic for custom resources
+
+        cache_key = '{}-{}'.format(req.method, req.url)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel('INFO')
+        logger = logging.getLogger('yee')
+        logger.setLevel('INFO')
+        logger.addHandler(console_handler)
+        logger.info(cache_key)
+
+        response = self.cache_region.get(cache_key, self.cache_expiration_time)
+
+        if response is NO_VALUE:
+            substrate01 = SubstrateInterface(SHARDS_TABLE['shard.0'])
+            substrate02 = SubstrateInterface(SHARDS_TABLE['shard.1'])
+            substrate03 = SubstrateInterface(SHARDS_TABLE['shard.2'])
+            substrate04 = SubstrateInterface(SHARDS_TABLE['shard.3'])
+
+            shard01 = substrate01.get_block_header(None)
+            shard01['finalizedNum'] = substrate01.get_block_number(substrate01.get_chain_finalised_head())
+            shard02 = substrate02.get_block_header(None)
+            shard02['finalizedNum'] = substrate02.get_block_number(substrate02.get_chain_finalised_head())
+            shard03 = substrate03.get_block_header(None)
+            shard03['finalizedNum'] = substrate03.get_block_number(substrate03.get_chain_finalised_head())
+            shard04 = substrate04.get_block_header(None)
+            shard04['finalizedNum'] = substrate04.get_block_number(substrate04.get_chain_finalised_head())
+            response = self.get_jsonapi_response(
+                data={
+                    'type': 'FinalizedHeadList',
+                    'attributes': {
+                        'shard01': shard01,
+                        'shard02': shard02,
+                        'shard03': shard03,
+                        'shard04': shard04
+                    }
+                 },
+             )
+
+            self.cache_region.set(cache_key, response)
+            resp.set_header('X-Cache', 'MISS')
+        else:
+            resp.set_header('X-Cache', 'HIT')
+
+        resp.media = response
 
 class BalanceTransferListResource(JSONAPIListResource):
     def get_query(self):
         return Extrinsic.query(self.session).filter_by(module_id='balances', call_id='transfer').order_by(
             Extrinsic.block_id.desc())
 
+    #block = Block.query(self.session).filter(Block.hash == block_hash).first()
+
     def apply_filters(self, query, params):
+        if params.get('filter[dest]'):
+            account_id = bytes(bech32.decode(HRP, params.get('filter[dest]'))[1]).hex()
+            query = query.filter_by(dest=account_id)
         if params.get('filter[address]'):
             account_id = bytes(bech32.decode(HRP, params.get('filter[address]'))[1]).hex()
 
-            query = query.filter_by(address=account_id)
+            query = query.filter(or_(Extrinsic.address==account_id,Extrinsic.dest==account_id))
         if params.get('filter[call_id]'):
             query = query.filter_by(call_id=params.get('filter[call_id]'))
 
@@ -442,6 +501,7 @@ class BalanceTransferDetailResource(JSONAPIDetailResource):
             'id': item.extrinsic_hash,
             'attributes': {
                 'block_id': item.block_id,
+                'extrinsic': item.extrinsic,
                 'extrinsic_hash': item.extrinsic_hash,
                 'extrinsic_idx': item.extrinsic_idx,
                 'sender': bech32.encode(HRP, bytes().fromhex(item.address)),
