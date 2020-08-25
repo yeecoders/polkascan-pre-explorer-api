@@ -27,7 +27,8 @@ from app.models.data import Block, Extrinsic, Event, RuntimeCall, RuntimeEvent, 
     BlockTotal, SessionValidator, Log, DemocracyReferendum, AccountIndex, RuntimeConstant, SessionNominator, \
     DemocracyVote
 from app.resources.base import JSONAPIResource, JSONAPIListResource, JSONAPIDetailResource
-from app.settings import SHARDS_TABLE, SUBSTRATE_RPC_URL, SUBSTRATE_METADATA_VERSION, SUBSTRATE_ADDRESS_TYPE, TYPE_REGISTRY, HRP
+from app.settings import SHARDS_TABLE, SUBSTRATE_RPC_URL, SUBSTRATE_METADATA_VERSION, SUBSTRATE_ADDRESS_TYPE, \
+    TYPE_REGISTRY, HRP
 from app.type_registry import load_type_registry
 from app.utils.ss58 import ss58_decode, ss58_encode
 from scalecodec.base import RuntimeConfiguration
@@ -88,10 +89,11 @@ class BlockListResource(JSONAPIListResource):
         return Block.query(self.session).order_by(
             Block.id.desc()
         )
+
+
 class AssetListResource(JSONAPIListResource):
     def apply_filters(self, query, params):
         return query.filter_by(module_id='assets', event_id='issued')
-
 
     def get_query(self):
         return Event.query(self.session).order_by(Event.id.desc())
@@ -109,6 +111,7 @@ class AssetListResource(JSONAPIListResource):
     #             'total_supply': '123434'
     #         }
     #     }
+
 
 class BlockTotalDetailsResource(JSONAPIDetailResource):
 
@@ -128,7 +131,7 @@ class ExtrinsicListResource(JSONAPIListResource):
 
     def get_query(self):
         return Extrinsic.query(self.session).order_by(
-            Extrinsic.block_id.desc()
+            Extrinsic.datetime.desc()
         )
 
     def apply_filters(self, query, params):
@@ -160,7 +163,7 @@ class ExtrinsicDetailResource(JSONAPIDetailResource):
         if 'origin-' not in item_id and '-' in item_id:
             st = item_id.split("-")
             return Extrinsic.query(self.session).filter_by(extrinsic_idx=int(st[2]), block_id=int(st[1]),
-                                                       shard_num=int(st[0])).first()
+                                                           shard_num=int(st[0])).first()
 
         if len(item_id) < 10:
             return Extrinsic.query(self.session).filter_by(id=item_id).first()
@@ -174,8 +177,6 @@ class ExtrinsicDetailResource(JSONAPIDetailResource):
             return Extrinsic.query(self.session).filter_by(extrinsic_hash=item_id[2:]).first()
         else:
             return Extrinsic.query(self.session).filter_by(extrinsic_hash=item_id).first()
-
-
 
 
 class EventsListResource(JSONAPIListResource):
@@ -203,7 +204,7 @@ class EventDetailResource(JSONAPIDetailResource):
         if '-' in item_id:
             st = item_id.split("-")
             return Event.query(self.session).filter_by(event_idx=int(st[2]), block_id=int(st[1]),
-                                                     shard_num=int(st[0])).first()
+                                                       shard_num=int(st[0])).first()
 
         else:
             return Event.query(self.session).filter_by(id=item_id.split('-')[0]).first()
@@ -214,7 +215,8 @@ class EventDetailResource(JSONAPIDetailResource):
         json_dic = []
         if item.module_id == 'assets' and item.event_id == 'Issued':
             json_dic = [{"type": "AssetDetail", "value": {"shard_code": '', "id": '',
-                         "name": '', "issuer": '', "decimals": '',"total_supply": ''}, "valueRaw": ""}]
+                                                          "name": '', "issuer": '', "decimals": '', "total_supply": ''},
+                         "valueRaw": ""}]
             json_str = json_dic[0]['value']
             shard_code_hex = item.attributes[0]['valueRaw'].upper()
             shard_code_10 = int(shard_code_hex.upper(), 16)
@@ -272,7 +274,7 @@ class LogDetailResource(JSONAPIDetailResource):
         # return Log.query(self.session).get(item_id.split('-'))
 
     def serialize_item(self, item):
-        if item.log_idx ==1:
+        if item.log_idx == 1:
             typeshow = 'Other'
         else:
             typeshow = item.data['type']
@@ -293,7 +295,7 @@ class LogDetailResource(JSONAPIDetailResource):
                 'type_id': item.type_id,
                 'type': item.type,
                 'data': item.data,
-                'typeshow':typeshow,
+                'typeshow': typeshow,
                 'shard_num': item.shard_num
             }
         }
@@ -313,7 +315,7 @@ class NetworkStatisticsResource(JSONAPIResource):
         logger = logging.getLogger('yee')
         logger.setLevel('DEBUG')
         logger.addHandler(console_handler)
-        logger.info(cache_key)
+        # logger.info(cache_key)
 
         response = self.cache_region.get(cache_key, self.cache_expiration_time)
 
@@ -329,9 +331,9 @@ class NetworkStatisticsResource(JSONAPIResource):
             event = Event.query(self.session).filter_by(
                 id=self.session.query(func.max(Event.id)).one()[0]).first()
             if event is None:
-                  eventid=0
+                eventid = 0
             else:
-                eventid=event.id
+                eventid = event.id
 
             if best_block:
                 substrate = SubstrateInterface(SUBSTRATE_RPC_URL, metadata_version=SUBSTRATE_METADATA_VERSION)
@@ -375,6 +377,7 @@ class NetworkStatisticsResource(JSONAPIResource):
 
         resp.media = response
 
+
 class FinalizedHeadListResource(JSONAPIResource):
     cache_expiration_time = 26
 
@@ -389,7 +392,7 @@ class FinalizedHeadListResource(JSONAPIResource):
         logger = logging.getLogger('yee')
         logger.setLevel('INFO')
         logger.addHandler(console_handler)
-        logger.info(cache_key)
+        # logger.info(cache_key)
 
         response = self.cache_region.get(cache_key, self.cache_expiration_time)
 
@@ -416,8 +419,8 @@ class FinalizedHeadListResource(JSONAPIResource):
                         'shard03': shard03,
                         'shard04': shard04
                     }
-                 },
-             )
+                },
+            )
 
             self.cache_region.set(cache_key, response)
             resp.set_header('X-Cache', 'MISS')
@@ -426,12 +429,13 @@ class FinalizedHeadListResource(JSONAPIResource):
 
         resp.media = response
 
+
 class BalanceTransferListResource(JSONAPIListResource):
     def get_query(self):
         return Extrinsic.query(self.session).filter_by(module_id='balances', call_id='transfer').order_by(
-            Extrinsic.block_id.desc())
+            Extrinsic.datetime.desc())
 
-    #block = Block.query(self.session).filter(Block.hash == block_hash).first()
+    # block = Block.query(self.session).filter(Block.hash == block_hash).first()
 
     def apply_filters(self, query, params):
         if params.get('filter[dest]'):
@@ -440,7 +444,7 @@ class BalanceTransferListResource(JSONAPIListResource):
         if params.get('filter[address]'):
             account_id = bytes(bech32.decode(HRP, params.get('filter[address]'))[1]).hex()
 
-            query = query.filter(or_(Extrinsic.address==account_id,Extrinsic.dest==account_id))
+            query = query.filter(or_(Extrinsic.address == account_id, Extrinsic.dest == account_id))
         if params.get('filter[call_id]'):
             query = query.filter_by(call_id=params.get('filter[call_id]'))
 
@@ -973,3 +977,49 @@ class RuntimeConstantDetailResource(JSONAPIDetailResource):
             module_id=module_id,
             name=name
         ).first()
+
+
+class AddressFeeSumResource(JSONAPIResource):
+    cache_expiration_time = 30
+
+    def on_get(self, req, resp, item_id=None):
+        resp.status = falcon.HTTP_200
+
+        # TODO make caching more generic for custom resources
+
+        cache_key = '{}-{}'.format(req.method, req.url)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel('INFO')
+        logger = logging.getLogger('yee')
+        logger.setLevel('INFO')
+        logger.addHandler(console_handler)
+        # logger.info(cache_key)
+
+        response = self.cache_region.get(cache_key, self.cache_expiration_time)
+
+        if response is NO_VALUE:
+            count = self.session.query(func.count(Block.id)).filter(Block.coinbase == item_id).scalar()
+            listbl = Block.query(self.session).filter(Block.coinbase == item_id, Block.fee_reward > 0).all()
+            sum = 0
+            if len(listbl) > 0:
+                for b in listbl:
+                    sum = sum + b.fee_reward
+                sum = sum / 100000000
+            logger.info(count)
+            logger.info(sum)
+            response = self.get_jsonapi_response(
+                data={
+                    'type': 'AddressFeeSum',
+                    'attributes': {
+                        'block_reward_sum': str(count * 64),
+                        'fee_reward_sum': str(sum)
+                    }
+                },
+            )
+
+            self.cache_region.set(cache_key, response)
+            resp.set_header('X-Cache', 'MISS')
+        else:
+            resp.set_header('X-Cache', 'HIT')
+
+        resp.media = response
