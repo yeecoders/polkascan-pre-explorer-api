@@ -213,6 +213,7 @@ class EventDetailResource(JSONAPIDetailResource):
 
     def serialize_item(self, item):
         json_dic = []
+        attributes = None
         if item.module_id == 'assets' and item.event_id == 'Issued':
             json_dic = [{"type": "AssetDetail", "value": {"shard_code": '', "id": '',
                                                           "name": '', "issuer": '', "decimals": '', "total_supply": ''},
@@ -231,7 +232,9 @@ class EventDetailResource(JSONAPIDetailResource):
             json_str['issuer'] = bech32.encode(HRP, bytes().fromhex(item.attributes[3]['value'].replace('0x', '')))
             json_str['decimals'] = item.attributes[5]['value']
             json_str['total_supply'] = item.attributes[4]['value']
-
+            attributes = json_dic
+        else:
+            attributes = item.attributes
         return {
             'type': 'event',
             'id': item.id,
@@ -246,7 +249,7 @@ class EventDetailResource(JSONAPIDetailResource):
                 'system': item.system,
                 'module': item.module,
                 'phase': item.module,
-                'attributes': json_dic,
+                'attributes': attributes,
                 'shard_num': item.shard_num
             }
         }
