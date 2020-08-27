@@ -68,8 +68,14 @@ class BlockDetailsResource(JSONAPIDetailResource):
                                                                                     shard_num=item.shard_num).order_by(
                 'extrinsic_idx')
         if 'inherents' in include_list:
-            relationships['inherents'] = Extrinsic.query(self.session).filter_by(block_id=item.bid, signed=0,
-                                                                                 shard_num=item.shard_num).order_by(
+            relationships['inherents'] = Extrinsic.query(self.session).filter(Extrinsic.block_id==item.bid, Extrinsic.signed==0,
+                                                                                 Extrinsic.shard_num==item.shard_num,Extrinsic.module_id !='relay').order_by(
+                'extrinsic_idx')
+        if 'relay' in include_list:
+            relationships['relay'] = Extrinsic.query(self.session).filter(Extrinsic.block_id == item.bid,
+                                                                              Extrinsic.signed == 0,
+                                                                              Extrinsic.shard_num == item.shard_num,
+                                                                              Extrinsic.module_id == 'relay').order_by(
                 'extrinsic_idx')
         if 'events' in include_list:
             relationships['events'] = Event.query(self.session).filter_by(block_id=item.bid, system=0,
