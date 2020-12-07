@@ -96,6 +96,12 @@ class BlockListResource(JSONAPIListResource):
             Block.id.desc()
         )
 
+    def apply_filters(self, query, params):
+
+        if params.get('filter[address]'):
+            query = query.filter_by(coinbase=params.get('filter[address]'))
+        return query
+
 
 class AssetListResource(JSONAPIListResource):
     def apply_filters(self, query, params):
@@ -590,6 +596,13 @@ class AccountDetailResource(JSONAPIDetailResource):
             relationships['indices'] = AccountIndex.query(self.session).filter_by(
                 account_id=item.id).order_by(AccountIndex.updated_at_block.desc())
 
+        if 'rewards' in include_list:
+            relationships['rewards'] = Block.query(self.session).filter_by(
+                coinbase=bech32.encode(HRP, bytes().fromhex(item.id))).order_by(Block.id.desc())
+
+            #  Block.query(self.session).order_by(Block.id.desc()
+            # count = self.session.query(func.count(Block.id)).filter(Block.coinbase == item_id).scalar()
+
         return relationships
 
     def serialize_item(self, item):
@@ -1007,8 +1020,12 @@ class AddressFeeSumResource(JSONAPIResource):
         response = self.cache_region.get(cache_key, self.cache_expiration_time)
 
         if response is NO_VALUE:
+            logger.info(time.strftime("%a %b %d %H:%M:%S %Y", time.localtime()))
             count = self.session.query(func.count(Block.id)).filter(Block.coinbase == item_id).scalar()
             listbl = Block.query(self.session).filter(Block.coinbase == item_id, Block.fee_reward > 0).all()
+
+            #select sum(fee_reward) from data_block where coinbase='yee1w3hn8vhurrjf900zkzl674alsfgxf3vnj8h03run4f3nx5durqrsdsu9r8' and fee_reward>0 ;
+            logger.info(time.strftime("%a %b %d %H:%M:%S %Y", time.localtime()))
             sum = 0
             if len(listbl) > 0:
                 for b in listbl:
@@ -1016,6 +1033,7 @@ class AddressFeeSumResource(JSONAPIResource):
                 sum = sum / 100000000
             logger.info(count)
             logger.info(sum)
+            logger.info(time.strftime("%a %b %d %H:%M:%S %Y", time.localtime()))
             response = self.get_jsonapi_response(
                 data={
                     'type': 'AddressFeeSum',

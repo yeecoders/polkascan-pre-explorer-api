@@ -29,10 +29,11 @@ DB_CONNECTION = os.environ.get("DB_CONNECTION", "mysql+mysqlconnector://{}:{}@{}
     DB_USERNAME, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME
 ))
 
-SUBSTRATE_RPC_URL = os.environ.get("SUBSTRATE_RPC_URL", "http://3.1.169.4:9933/")
+SUBSTRATE_RPC_URL = os.environ.get("SUBSTRATE_RPC_URL", "http://192.168.1.242:9933/")
 SUBSTRATE_ADDRESS_TYPE = int(os.environ.get("SUBSTRATE_ADDRESS_TYPE", 42))
 SUBSTRATE_METADATA_VERSION = int(os.environ.get("SUBSTRATE_METADATA_VERSION", 3))
-
+SHARDS_TABLE = {"shard.0": "http://192.168.1.68:9930/", "shard.1": "http://192.168.1.68:9931/",
+                "shard.2": "http://192.168.1.135:9932/", "shard.3": "http://192.168.1.135:9933/"}
 TYPE_REGISTRY = os.environ.get("TYPE_REGISTRY", "default")
 HRP = os.environ.get("HRP", "tyee")
 
