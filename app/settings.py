@@ -19,21 +19,21 @@
 #  settings.py
 import os
 
-DB_NAME = os.environ.get("DB_NAME", "polkascan")
+DB_NAME = os.environ.get("DB_NAME", "yeescan")
 DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
 DB_PORT = os.environ.get("DB_PORT", 3306)
 DB_USERNAME = os.environ.get("DB_USERNAME", "root")
-DB_PASSWORD = os.environ.get("DB_PASSWORD", "root")
+DB_PASSWORD = os.environ.get("DB_PASSWORD", "123456")
 
 DB_CONNECTION = os.environ.get("DB_CONNECTION", "mysql+mysqlconnector://{}:{}@{}:{}/{}".format(
     DB_USERNAME, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME
 ))
 
-SUBSTRATE_RPC_URL = os.environ.get("SUBSTRATE_RPC_URL", "http://192.168.1.242:9933/")
+SUBSTRATE_RPC_URL = os.environ.get("SUBSTRATE_RPC_URL", "http://192.168.1.242:9933/")#switch rpc
 SUBSTRATE_ADDRESS_TYPE = int(os.environ.get("SUBSTRATE_ADDRESS_TYPE", 42))
 SUBSTRATE_METADATA_VERSION = int(os.environ.get("SUBSTRATE_METADATA_VERSION", 3))
 SHARDS_TABLE = {"shard.0": "http://192.168.1.68:9930/", "shard.1": "http://192.168.1.68:9931/",
-                "shard.2": "http://192.168.1.135:9932/", "shard.3": "http://192.168.1.135:9933/"}
+                "shard.2": "http://192.168.1.135:9932/", "shard.3": "http://192.168.1.135:9933/"}#四个分片的 rpc
 TYPE_REGISTRY = os.environ.get("TYPE_REGISTRY", "default")
 HRP = os.environ.get("HRP", "tyee")
 
@@ -41,7 +41,7 @@ DOGPILE_CACHE_SETTINGS = {
 
     'default_list_cache_expiration_time': 6,
     'default_detail_cache_expiration_time': 3600,
-    'host': os.environ.get("DOGPILE_CACHE_HOST", "redis"),
+    'host': os.environ.get("DOGPILE_CACHE_HOST", "127.0.0.1"),#本地使用127.0.0.1，生产使用redis
     'port': os.environ.get("DOGPILE_CACHE_HOST", 6379),
     'db': os.environ.get("DOGPILE_CACHE_DB", 10)
 }
